@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from app.browse import list_notes
 from app.embeddings import embed
 from app.store import query
 
@@ -22,6 +23,10 @@ class SearchResponse(BaseModel):
     matches: list[SearchMatch]
 
 
+class BrowseRequest(BaseModel):
+    folder: str
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -32,3 +37,8 @@ def search(request: SearchRequest):
     query_embedding = embed(request.query)
     matches = query(query_embedding, top_k=request.top_k)
     return {"matches": matches}
+
+
+@app.post("/browse")
+def browse(request: BrowseRequest):
+    return list_notes(request.folder)

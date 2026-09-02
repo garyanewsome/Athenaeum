@@ -62,6 +62,34 @@ compromise, not the homelab itself.
   retrieval *quality* just hasn't been tuned yet. Revisit if/when a
   real consumer app makes this matter.
 
+### `/browse` — structural folder listing, built + image ready, not yet live
+Added after a real Hermes conversation surfaced a genuine gap: asked
+for files in a specific folder ("Burn St Productions"), got back
+results from three unrelated folders — semantic search has no concept
+of "list files under this exact path," it can only return "content
+that sounds related." `/browse {"folder": "..."}` (`app/browse.py`) is
+a literal directory listing against the same repo clone `sync.py`
+already maintains — case-insensitive substring match on folder name,
+returns matched folders + their `.md` files, or falls back to listing
+top-level folders if nothing matches. No path-traversal risk: `folder`
+is only ever matched against directory names already discovered via
+`rglob()`, never joined directly into a path.
+
+**Real bug caught and fixed while building this:** `athenaeum-api.yaml`
+never set `VAULT_REPO_PATH`, so the API pod was defaulting to
+`./vault-repo` (inside `/app`) instead of `/data/vault-repo` where the
+CronJob actually clones it — the API could never have seen the synced
+repo for *any* future file-level feature, not just this one. Fixed and
+**already applied live** (just an env var, no new image needed).
+
+**Deployment status:** image built (includes `/browse`) and sitting as
+a tarball on the server (`/tmp/athenaeum.tar`), but not yet imported —
+that needs the one `sudo k3s ctr images import` step. Once imported,
+restart with `kubectl rollout restart deployment/athenaeum-api`. Not
+yet tested against the real vault (only logic-tested locally against
+a `sample_vault` fixture) — verify with the actual failing query once
+deployed: ask Hermes to list files in "Burn St Productions."
+
 ### API deployed — live on the LAN
 `k8s/athenaeum-api.yaml` — Deployment + Service + Ingress
 (`athenaeum.home.local`), same PVC as the CronJob so it reads the same

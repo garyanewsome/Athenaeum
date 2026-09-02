@@ -21,6 +21,8 @@ spec:
         env:
         - name: CHROMA_DIR
           value: /data/chroma_data
+        - name: VAULT_REPO_PATH
+          value: /data/vault-repo
         volumeMounts:
         - name: athenaeum-data
           mountPath: /data
