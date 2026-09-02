@@ -1,0 +1,36 @@
+# Smoke test only — proves a K3s pod can pull the private vault repo
+# using the deploy key (via a K8s Secret), before Athenaeum's real
+# sync/diff/embed logic exists. Tear down once confirmed working.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vault-sync-test
+spec:
+  schedule: "*/15 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: git-sync-test
+            image: alpine/git
+            command:
+            - sh
+            - -c
+            - |
+              mkdir -p /root/.ssh
+              cp /secrets/id_ed25519 /root/.ssh/id_ed25519
+              chmod 600 /root/.ssh/id_ed25519
+              GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new" \
+                git clone git@github.com:garyanewsome/obsidian-vault.git /tmp/vault
+              echo "Clone succeeded: $(find /tmp/vault -name '*.md' | wc -l) markdown files found"
+            volumeMounts:
+            - name: deploy-key
+              mountPath: /secrets
+              readOnly: true
+          volumes:
+          - name: deploy-key
+            secret:
+              secretName: vault-deploy-key
+              defaultMode: 0400
+          restartPolicy: Never

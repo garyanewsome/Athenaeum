@@ -1,0 +1,58 @@
+# Real sync CronJob. Image built + imported into K3s's containerd
+# (no registry — `k3s ctr images import`), PVC backed by
+# /mnt/storage/athenaeum-data, vault-deploy-key Secret recreated.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vault-sync
+spec:
+  schedule: "0 * * * *"  # hourly — arbitrary starting point, adjust once real usage patterns are known
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          initContainers:
+          - name: ssh-key-setup
+            image: athenaeum:latest
+            imagePullPolicy: Never
+            command:
+            - sh
+            - -c
+            - |
+              mkdir -p /root/.ssh
+              cp /secrets/id_ed25519 /root/.ssh/id_ed25519
+              chmod 600 /root/.ssh/id_ed25519
+            volumeMounts:
+            - name: deploy-key
+              mountPath: /secrets
+              readOnly: true
+            - name: ssh-dir
+              mountPath: /root/.ssh
+          containers:
+          - name: vault-sync
+            image: athenaeum:latest
+            imagePullPolicy: Never
+            command: ["python", "sync.py"]
+            env:
+            - name: GIT_SSH_COMMAND
+              value: "ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new"
+            - name: VAULT_REPO_PATH
+              value: "/data/vault-repo"
+            - name: CHROMA_DIR
+              value: "/data/chroma_data"
+            volumeMounts:
+            - name: ssh-dir
+              mountPath: /root/.ssh
+            - name: athenaeum-data
+              mountPath: /data
+          volumes:
+          - name: deploy-key
+            secret:
+              secretName: vault-deploy-key
+              defaultMode: 0400
+          - name: ssh-dir
+            emptyDir: {}
+          - name: athenaeum-data
+            persistentVolumeClaim:
+              claimName: athenaeum-data
+          restartPolicy: Never
