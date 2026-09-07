@@ -46,6 +46,8 @@ Runs in K3s:
 
 No container registry — images are built locally and loaded directly via `k3s ctr images import` (see the homelab repo for the general K3s setup).
 
+To redeploy after a code change: `./deploy.sh` — builds the image, reimports it into K3s, and restarts the deployment. The sync CronJob shares the same image, so it picks up the change on its next scheduled run automatically.
+
 ## Status
 
 - [x] `/search` — working against the real vault
