@@ -7,8 +7,17 @@ metadata:
   name: vault-sync
 spec:
   schedule: "0 * * * *"  # hourly — arbitrary starting point, adjust once real usage patterns are known
+  # Without these, a stuck job (e.g. ErrImageNeverPull after the image got
+  # evicted by disk-pressure GC) never reaches a terminal Failed state, so
+  # Kubernetes' own history-limit cleanup — which only prunes terminal
+  # jobs — has nothing to prune. Found this the hard way: ~150 stuck job
+  # pods piled up over 6 days completely silently.
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
+      activeDeadlineSeconds: 600  # force-fail a stuck job instead of leaving it "active" forever
+      backoffLimit: 2
       template:
         spec:
           initContainers:
