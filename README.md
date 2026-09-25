@@ -6,7 +6,7 @@ RAG retrieval and structural folder-listing API over a personal Obsidian vault.
 
 - `POST /search {"query": "...", "top_k": 5}` — semantic search, returns matching chunks with source paths and distance scores
 - `POST /browse {"folder": "..."}` — literal folder listing (case-insensitive substring match on folder name), returns matched folders + their `.md` files, or top-level folders if nothing matches
-- `GET /tasks` — open `- [ ]` checkboxes across the vault clone (for Hermes's nightly Obsidian → Todo import): skips empty boxes, templates/dot-folders, Tasks-plugin recurring (`🔁`) lines, and any text repeated in 5+ notes (habit/template lines); parses a `📅 YYYY-MM-DD` due date
+- `GET /tasks` — open `- [ ]` checkboxes in the daily notes folder (`TASKS_SCAN_FOLDER`, default `00 System/Daily Notes`) (for Hermes's nightly Obsidian → Todo import): skips empty boxes, templates/dot-folders, Tasks-plugin recurring (`🔁`) lines, and any text repeated in 5+ notes (habit/template lines); parses a `📅 YYYY-MM-DD` due date
 - `GET /health`
 
 No chat logic, no persona, no conversation state — a pure retrieval service meant to be called by other applications as a tool.

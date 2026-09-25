@@ -1,6 +1,7 @@
 """Open-checkbox scan of the vault clone (`- [ ] text`), for Hermes's
 nightly Obsidian -> Todo import. Reads the same clone sync.py maintains, so
-it only sees what's been pushed to the vault's git remote.
+it only sees what's been pushed to the vault's git remote. Limited to
+TASKS_SCAN_FOLDER (daily notes) — not song/project notes.
 
 Two kinds of noise found in the real vault, both filtered here rather than
 left for the caller to guess at:
@@ -16,7 +17,7 @@ the threshold and comes back once, not once per note.
 import re
 from pathlib import Path
 
-from app.config import VAULT_REPO_PATH
+from app.config import TASKS_SCAN_FOLDER, VAULT_REPO_PATH
 
 REPEAT_THRESHOLD = 5
 
@@ -38,9 +39,13 @@ def scan_open_tasks() -> dict:
     if not repo_root.exists():
         return {"error": "Vault not yet synced — no repo clone present."}
 
+    scan_root = (repo_root / TASKS_SCAN_FOLDER).resolve()
+    if not scan_root.is_dir() or repo_root not in scan_root.parents:
+        return {"error": f"Task scan folder not found in the vault: {TASKS_SCAN_FOLDER}"}
+
     # normalized text -> {"text", "due", "sources": [relative paths]}
     found: dict[str, dict] = {}
-    for path in sorted(repo_root.rglob("*.md")):
+    for path in sorted(scan_root.rglob("*.md")):
         relative = path.relative_to(repo_root)
         if _skipped(relative):
             continue
