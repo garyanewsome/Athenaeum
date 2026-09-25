@@ -34,7 +34,19 @@ def _skipped(relative: Path) -> bool:
     return any(part.startswith(".") or part.lower() == "templates" for part in relative.parts)
 
 
-def scan_open_tasks() -> dict:
+def _resolve_extra(repo_root: Path, relative: str) -> Path | None:
+    path = (repo_root / relative).resolve()
+    if repo_root in path.parents and path.is_file() and path.suffix == ".md":
+        return path
+    return None
+
+
+def scan_open_tasks(extra_files: list[str] | None = None) -> dict:
+    """extra_files: additional vault-relative .md files to scan beyond
+    TASKS_SCAN_FOLDER — used by Hermes's one-time first-run import of a
+    standing task-list note. A path that doesn't resolve to a real .md file
+    inside the vault is an error, not silently skipped, so a caller relying
+    on it (and about to record "done") finds out."""
     repo_root = Path(VAULT_REPO_PATH).resolve()
     if not repo_root.exists():
         return {"error": "Vault not yet synced — no repo clone present."}
@@ -43,9 +55,17 @@ def scan_open_tasks() -> dict:
     if not scan_root.is_dir() or repo_root not in scan_root.parents:
         return {"error": f"Task scan folder not found in the vault: {TASKS_SCAN_FOLDER}"}
 
+    paths = sorted(scan_root.rglob("*.md"))
+    for relative in extra_files or []:
+        extra = _resolve_extra(repo_root, relative)
+        if extra is None:
+            return {"error": f"Extra file not found in the vault: {relative}"}
+        if extra not in paths:
+            paths.append(extra)
+
     # normalized text -> {"text", "due", "sources": [relative paths]}
     found: dict[str, dict] = {}
-    for path in sorted(scan_root.rglob("*.md")):
+    for path in paths:
         relative = path.relative_to(repo_root)
         if _skipped(relative):
             continue

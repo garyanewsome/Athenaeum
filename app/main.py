@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import BaseModel
 
 from app.browse import list_notes
@@ -46,5 +46,5 @@ def browse(request: BrowseRequest):
 
 
 @app.get("/tasks")
-def tasks():
-    return scan_open_tasks()
+def tasks(extra: list[str] = Query(default=[])):
+    return scan_open_tasks(extra)
