@@ -1,0 +1,82 @@
+"""Open-checkbox scan of the vault clone (`- [ ] text`), for Hermes's
+nightly Obsidian -> Todo import. Reads the same clone sync.py maintains, so
+it only sees what's been pushed to the vault's git remote.
+
+Two kinds of noise found in the real vault, both filtered here rather than
+left for the caller to guess at:
+- empty checkboxes (`- [ ]` with no text) — daily-note template scaffolding
+- the same text repeated across many notes ("Write one line everyday" is in
+  ~19 daily notes, "Music Production" in ~10) — a habit/template line, not
+  a task. Anything appearing in REPEAT_THRESHOLD or more distinct files is
+  treated as that and dropped, without hardcoding any particular text.
+A task carried forward through a few consecutive daily notes stays under
+the threshold and comes back once, not once per note.
+"""
+
+import re
+from pathlib import Path
+
+from app.config import VAULT_REPO_PATH
+
+REPEAT_THRESHOLD = 5
+
+# Tolerates `-[ ]` (no space) as well as the standard `- [ ]`, and `*` bullets.
+_OPEN_TASK = re.compile(r"^\s*[-*]\s*\[ \]\s*(\S.*?)\s*$")
+_DUE = re.compile(r"\s*📅\s*(\d{4}-\d{2}-\d{2})")
+
+
+def _normalize(text: str) -> str:
+    return " ".join(text.lower().split())
+
+
+def _skipped(relative: Path) -> bool:
+    return any(part.startswith(".") or part.lower() == "templates" for part in relative.parts)
+
+
+def scan_open_tasks() -> dict:
+    repo_root = Path(VAULT_REPO_PATH).resolve()
+    if not repo_root.exists():
+        return {"error": "Vault not yet synced — no repo clone present."}
+
+    # normalized text -> {"text", "due", "sources": [relative paths]}
+    found: dict[str, dict] = {}
+    for path in sorted(repo_root.rglob("*.md")):
+        relative = path.relative_to(repo_root)
+        if _skipped(relative):
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError):
+            continue
+        for line in lines:
+            match = _OPEN_TASK.match(line)
+            if not match:
+                continue
+            raw = match.group(1)
+            # The Tasks plugin's own recurrence (e.g. birthdays: "🔁 every
+            # year") — the plugin already owns re-surfacing those inside
+            # Obsidian, and importing one as a plain one-off todo would
+            # misrepresent it.
+            if "🔁" in raw:
+                continue
+            due_match = _DUE.search(raw)
+            text = _DUE.sub("", raw).strip()
+            if not text:
+                continue
+            entry = found.setdefault(
+                _normalize(text), {"text": text, "due": due_match.group(1) if due_match else None, "sources": []}
+            )
+            source = relative.as_posix()
+            if source not in entry["sources"]:
+                entry["sources"].append(source)
+
+    tasks, repeated = [], []
+    for entry in found.values():
+        if len(entry["sources"]) >= REPEAT_THRESHOLD:
+            repeated.append({"text": entry["text"], "files": len(entry["sources"])})
+            continue
+        # sources are in sorted path order, which for daily notes is
+        # chronological — the last one is the most recent mention.
+        tasks.append({"text": entry["text"], "due": entry["due"], "source": entry["sources"][-1]})
+
+    return {"tasks": tasks, "excluded_repeated": repeated}

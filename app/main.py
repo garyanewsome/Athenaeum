@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from app.browse import list_notes
 from app.embeddings import embed
 from app.store import query
+from app.tasks import scan_open_tasks
 
 app = FastAPI(title="Athenaeum")
 
@@ -42,3 +43,8 @@ def search(request: SearchRequest):
 @app.post("/browse")
 def browse(request: BrowseRequest):
     return list_notes(request.folder)
+
+
+@app.get("/tasks")
+def tasks():
+    return scan_open_tasks()
